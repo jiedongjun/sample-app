@@ -34,8 +34,8 @@ spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     url: jdbc:postgresql://localhost:5432/sampleApp
-    username: sampleApp
-    password:
+    username: postgres
+    password: postgre.
     hikari:
       poolName: Hikari
       auto-commit: false
@@ -123,4 +123,6 @@ jhipster:
 # https://www.jhipster.tech/common-application-properties/
 # ===================================================================
 
-# application:
+application:
+  file-path: file:./multipart/img/
+  file-url: http://happyouplay.com/

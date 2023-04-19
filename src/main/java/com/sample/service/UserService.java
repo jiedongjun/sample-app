@@ -1,5 +1,6 @@
 package com.sample.service;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sample.config.Constants;
 import com.sample.domain.Authority;
 import com.sample.domain.User;
@@ -7,8 +8,11 @@ import com.sample.repository.AuthorityRepository;
 import com.sample.repository.UserRepository;
 import com.sample.security.AuthoritiesConstants;
 import com.sample.security.SecurityUtils;
+import com.sample.security.jwt.TokenProvider;
 import com.sample.service.dto.AdminUserDTO;
 import com.sample.service.dto.UserDTO;
+import com.sample.util.ObjectNodeUtil;
+import com.sample.web.rest.vm.ResultVM;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -19,6 +23,10 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +48,27 @@ public class UserService {
     private final AuthorityRepository authorityRepository;
 
     private final CacheManager cacheManager;
+    private final TokenProvider tokenProvider;
+    private final WeixinService weixinService;
+
+    private final AuthenticationManagerBuilder authenticationManagerBuilder;
 
     public UserService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
         AuthorityRepository authorityRepository,
-        CacheManager cacheManager
+        CacheManager cacheManager,
+        TokenProvider tokenProvider,
+        WeixinService weixinService,
+        AuthenticationManagerBuilder authenticationManagerBuilder
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authorityRepository = authorityRepository;
         this.cacheManager = cacheManager;
+        this.tokenProvider = tokenProvider;
+        this.weixinService = weixinService;
+        this.authenticationManagerBuilder = authenticationManagerBuilder;
     }
 
     public Optional<User> activateRegistration(String key) {
@@ -99,50 +117,57 @@ public class UserService {
             );
     }
 
-    public User registerUser(AdminUserDTO userDTO, String password) {
-        userRepository
-            .findOneByLogin(userDTO.getLogin().toLowerCase())
-            .ifPresent(
-                existingUser -> {
-                    boolean removed = removeNonActivatedUser(existingUser);
-                    if (!removed) {
-                        throw new UsernameAlreadyUsedException();
-                    }
-                }
-            );
-        userRepository
-            .findOneByEmailIgnoreCase(userDTO.getEmail())
-            .ifPresent(
-                existingUser -> {
-                    boolean removed = removeNonActivatedUser(existingUser);
-                    if (!removed) {
-                        throw new EmailAlreadyUsedException();
-                    }
-                }
-            );
-        User newUser = new User();
-        String encryptedPassword = passwordEncoder.encode(password);
-        newUser.setLogin(userDTO.getLogin().toLowerCase());
-        // new user gets initially a generated password
-        newUser.setPassword(encryptedPassword);
-        newUser.setFirstName(userDTO.getFirstName());
-        newUser.setLastName(userDTO.getLastName());
-        if (userDTO.getEmail() != null) {
-            newUser.setEmail(userDTO.getEmail().toLowerCase());
+    public ResultVM registerUser(AdminUserDTO userDTO) {
+        ResultVM resultVM = new ResultVM(0, "注册成功");
+        ObjectNode body = weixinService.getLoginInfo(userDTO.getLogin());
+        if (body == null || (body.has("errcode") && body.get("errcode").asInt() != 0)) {
+            resultVM.setCode(-1);
+            resultVM.setData(body);
+            resultVM.setMessage("微信接口请求异常,请看data中的提示");
+            return resultVM;
         }
-        newUser.setImageUrl(userDTO.getImageUrl());
-        newUser.setLangKey(userDTO.getLangKey());
-        // new user is not active
-        newUser.setActivated(false);
-        // new user gets registration key
-        newUser.setActivationKey(RandomUtil.generateActivationKey());
-        Set<Authority> authorities = new HashSet<>();
-        authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
-        newUser.setAuthorities(authorities);
-        userRepository.save(newUser);
-        this.clearUserCaches(newUser);
-        log.debug("Created Information for User: {}", newUser);
-        return newUser;
+        String openid = body.get("openid").asText().toLowerCase();
+        log.info("openid: {}", openid);
+        Optional<User> oneByLogin = userRepository.findOneByLogin(openid);
+        User user;
+        if (oneByLogin.isPresent()) {
+            resultVM.setMessage("该账号已注册");
+            user = oneByLogin.get();
+        } else {
+            user = new User();
+            String encryptedPassword = passwordEncoder.encode(openid);
+            user.setLogin(openid);
+            // new user gets initially a generated password
+            user.setPassword(encryptedPassword);
+            if (userDTO.getFirstName() == null || "".equals(userDTO.getFirstName())) {
+                userDTO.setFirstName("微信用户");
+            }
+            user.setFirstName(userDTO.getFirstName());
+            user.setLastName(userDTO.getLastName());
+            if (userDTO.getEmail() != null) {
+                user.setEmail(userDTO.getEmail().toLowerCase());
+            }
+            if (userDTO.getImageUrl() == null || "".equals(userDTO.getImageUrl())) {
+                userDTO.setImageUrl("http://happyouplay.com/pic/BZbBlnC7BBqr0474ddcfd573dec9a0e8d47d105981f2.png");
+            }
+            user.setImageUrl(userDTO.getImageUrl());
+            user.setLangKey(userDTO.getLangKey());
+            // new user is not active
+            user.setActivated(true);
+            Set<Authority> authorities = new HashSet<>();
+            authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
+            user.setAuthorities(authorities);
+            userRepository.save(user);
+            this.clearUserCaches(user);
+            log.debug("Created Information for User: {}", user);
+        }
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(openid, openid);
+
+        Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = tokenProvider.createToken(authentication, true);
+        resultVM.setData(ObjectNodeUtil.createObjectNode().put("userId", user.getId()).put("token", "Bearer " + jwt));
+        return resultVM;
     }
 
     private boolean removeNonActivatedUser(User existingUser) {
@@ -264,6 +289,7 @@ public class UserService {
                     }
                     user.setLangKey(langKey);
                     user.setImageUrl(imageUrl);
+                    userRepository.save(user);
                     this.clearUserCaches(user);
                     log.debug("Changed Information for User: {}", user);
                 }
@@ -271,7 +297,8 @@ public class UserService {
     }
 
     @Transactional
-    public void changePassword(String currentClearTextPassword, String newPassword) {
+    public ResultVM changePassword(String currentClearTextPassword, String newPassword) {
+        ResultVM resultVM = new ResultVM(0, "修改成功");
         SecurityUtils
             .getCurrentUserLogin()
             .flatMap(userRepository::findOneByLogin)
@@ -279,7 +306,9 @@ public class UserService {
                 user -> {
                     String currentEncryptedPassword = user.getPassword();
                     if (!passwordEncoder.matches(currentClearTextPassword, currentEncryptedPassword)) {
-                        throw new InvalidPasswordException();
+                        resultVM.setCode(-1);
+                        resultVM.setMessage("修改失败");
+                        return;
                     }
                     String encryptedPassword = passwordEncoder.encode(newPassword);
                     user.setPassword(encryptedPassword);
@@ -287,6 +316,7 @@ public class UserService {
                     log.debug("Changed password for User: {}", user);
                 }
             );
+        return resultVM;
     }
 
     @Transactional(readOnly = true)
@@ -329,6 +359,7 @@ public class UserService {
 
     /**
      * Gets a list of all the authorities.
+     *
      * @return a list of all the authorities.
      */
     @Transactional(readOnly = true)
@@ -341,5 +372,17 @@ public class UserService {
         if (user.getEmail() != null) {
             Objects.requireNonNull(cacheManager.getCache(UserRepository.USERS_BY_EMAIL_CACHE)).evict(user.getEmail());
         }
+    }
+
+    public ResultVM findOneByUserId(long userId) {
+        ResultVM resultVM = new ResultVM(0, "查询成功");
+        Optional<User> oneByUserId = userRepository.findOneById(userId);
+        if (oneByUserId.isPresent()) {
+            resultVM.setData(ObjectNodeUtil.objectToJson(oneByUserId.get(), ObjectNode.class));
+            return resultVM;
+        }
+        resultVM.setCode(-1);
+        resultVM.setMessage("用户不存在");
+        return resultVM;
     }
 }

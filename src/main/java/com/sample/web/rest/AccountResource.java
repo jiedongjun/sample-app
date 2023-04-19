@@ -1,16 +1,20 @@
 package com.sample.web.rest;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sample.domain.User;
 import com.sample.repository.UserRepository;
 import com.sample.security.SecurityUtils;
 import com.sample.service.MailService;
 import com.sample.service.UserService;
+import com.sample.service.WeixinService;
 import com.sample.service.dto.AdminUserDTO;
 import com.sample.service.dto.PasswordChangeDTO;
-import com.sample.service.dto.UserDTO;
+import com.sample.util.ObjectNodeUtil;
 import com.sample.web.rest.errors.*;
 import com.sample.web.rest.vm.KeyAndPasswordVM;
 import com.sample.web.rest.vm.ManagedUserVM;
+import com.sample.web.rest.vm.ResultVM;
+import io.swagger.annotations.ApiOperation;
 import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
@@ -41,11 +45,13 @@ public class AccountResource {
     private final UserService userService;
 
     private final MailService mailService;
+    private final WeixinService weixinService;
 
-    public AccountResource(UserRepository userRepository, UserService userService, MailService mailService) {
+    public AccountResource(UserRepository userRepository, UserService userService, MailService mailService, WeixinService weixinService) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.mailService = mailService;
+        this.weixinService = weixinService;
     }
 
     /**
@@ -56,14 +62,24 @@ public class AccountResource {
      * @throws EmailAlreadyUsedException {@code 400 (Bad Request)} if the email is already used.
      * @throws LoginAlreadyUsedException {@code 400 (Bad Request)} if the login is already used.
      */
+    @ApiOperation(value = "注册接口", tags = "账户模块", httpMethod = "POST", notes = "")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public void registerAccount(@Valid @RequestBody ManagedUserVM managedUserVM) {
-        if (isPasswordLengthInvalid(managedUserVM.getPassword())) {
-            throw new InvalidPasswordException();
+    public ResultVM registerAccount(@Valid @RequestBody ManagedUserVM managedUserVM) {
+        ResultVM resultVM = new ResultVM(0, "注册成功");
+        if (isPasswordLengthInvalid(managedUserVM.getLogin())) {
+            resultVM.setCode(-1);
+            resultVM.setMessage("密码最少" + ManagedUserVM.PASSWORD_MIN_LENGTH + "位，最多" + ManagedUserVM.PASSWORD_MAX_LENGTH + "位");
+            return resultVM;
         }
-        User user = userService.registerUser(managedUserVM, managedUserVM.getPassword());
-        mailService.sendActivationEmail(user);
+        resultVM = userService.registerUser(managedUserVM);
+        return resultVM;
+    }
+
+    @ApiOperation(value = "查询用户信息接口", tags = "账户模块", httpMethod = "GET", notes = "")
+    @GetMapping("/account/{userId}")
+    public ResultVM getUser(@PathVariable long userId) {
+        return userService.findOneByUserId(userId);
     }
 
     /**
@@ -114,17 +130,19 @@ public class AccountResource {
      * @throws RuntimeException {@code 500 (Internal Server Error)} if the user login wasn't found.
      */
     @PostMapping("/account")
-    public void saveAccount(@Valid @RequestBody AdminUserDTO userDTO) {
-        String userLogin = SecurityUtils
-            .getCurrentUserLogin()
-            .orElseThrow(() -> new AccountResourceException("Current user login not found"));
-        Optional<User> existingUser = userRepository.findOneByEmailIgnoreCase(userDTO.getEmail());
-        if (existingUser.isPresent() && (!existingUser.get().getLogin().equalsIgnoreCase(userLogin))) {
-            throw new EmailAlreadyUsedException();
+    public ResultVM saveAccount(@Valid @RequestBody AdminUserDTO userDTO) {
+        ResultVM resultVM = new ResultVM(0, "修改成功");
+        String userLogin = SecurityUtils.getCurrentUserLogin().orElse(null);
+        if (userLogin == null) {
+            resultVM.setCode(-1);
+            resultVM.setMessage("没有找到此login");
+            return resultVM;
         }
         Optional<User> user = userRepository.findOneByLogin(userLogin);
-        if (!user.isPresent()) {
-            throw new AccountResourceException("User could not be found");
+        if (user.isEmpty()) {
+            resultVM.setCode(-1);
+            resultVM.setMessage("没有找到login为" + userLogin + "的用户");
+            return resultVM;
         }
         userService.updateUser(
             userDTO.getFirstName(),
@@ -133,6 +151,9 @@ public class AccountResource {
             userDTO.getLangKey(),
             userDTO.getImageUrl()
         );
+        user = userRepository.findOneByLogin(userLogin);
+        resultVM.setData(ObjectNodeUtil.convertValue(user.get(), ObjectNode.class));
+        return resultVM;
     }
 
     /**
@@ -142,11 +163,14 @@ public class AccountResource {
      * @throws InvalidPasswordException {@code 400 (Bad Request)} if the new password is incorrect.
      */
     @PostMapping(path = "/account/change-password")
-    public void changePassword(@RequestBody PasswordChangeDTO passwordChangeDto) {
+    public ResultVM changePassword(@RequestBody PasswordChangeDTO passwordChangeDto) {
+        ResultVM resultVM = new ResultVM(0, "修改成功");
         if (isPasswordLengthInvalid(passwordChangeDto.getNewPassword())) {
-            throw new InvalidPasswordException();
+            resultVM.setCode(-1);
+            resultVM.setMessage("密码最少" + ManagedUserVM.PASSWORD_MIN_LENGTH + "位，最多" + ManagedUserVM.PASSWORD_MAX_LENGTH + "位");
         }
-        userService.changePassword(passwordChangeDto.getCurrentPassword(), passwordChangeDto.getNewPassword());
+        resultVM = userService.changePassword(passwordChangeDto.getCurrentPassword(), passwordChangeDto.getNewPassword());
+        return resultVM;
     }
 
     /**

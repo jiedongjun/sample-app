@@ -9,11 +9,9 @@ import javax.validation.constraints.Size;
 public class LoginVM {
 
     @NotNull
-    @Size(min = 1, max = 50)
+    @Size(min = 1, max = 100)
     private String username;
 
-    @NotNull
-    @Size(min = 4, max = 100)
     private String password;
 
     private boolean rememberMe;

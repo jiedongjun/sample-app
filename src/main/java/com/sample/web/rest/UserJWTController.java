@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sample.security.jwt.JWTFilter;
 import com.sample.security.jwt.TokenProvider;
 import com.sample.web.rest.vm.LoginVM;
+import io.swagger.annotations.ApiOperation;
 import javax.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,11 +31,12 @@ public class UserJWTController {
         this.authenticationManagerBuilder = authenticationManagerBuilder;
     }
 
+    @ApiOperation(value = "登录接口", tags = "账户模块", httpMethod = "POST", notes = "")
     @PostMapping("/authenticate")
     public ResponseEntity<JWTToken> authorize(@Valid @RequestBody LoginVM loginVM) {
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
             loginVM.getUsername(),
-            loginVM.getPassword()
+            loginVM.getUsername()
         );
 
         Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);

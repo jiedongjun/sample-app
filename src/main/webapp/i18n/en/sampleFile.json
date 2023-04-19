@@ -1,0 +1,25 @@
+{
+  "sampleApp": {
+    "sampleFile": {
+      "home": {
+        "title": "Sample Files",
+        "refreshListLabel": "Refresh list",
+        "createLabel": "Create a new Sample File",
+        "createOrEditLabel": "Create or edit a Sample File",
+        "notFound": "No Sample Files found"
+      },
+      "created": "A new Sample File is created with identifier {{ param }}",
+      "updated": "A Sample File is updated with identifier {{ param }}",
+      "deleted": "A Sample File is deleted with identifier {{ param }}",
+      "delete": {
+        "question": "Are you sure you want to delete Sample File {{ id }}?"
+      },
+      "detail": {
+        "title": "Sample File"
+      },
+      "id": "ID",
+      "url": "Url",
+      "sampleId": "Sample Id"
+    }
+  }
+}

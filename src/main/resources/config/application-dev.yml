@@ -105,4 +105,7 @@ jhipster:
 # https://www.jhipster.tech/common-application-properties/
 # ===================================================================
 
-# application:
+application:
+  file-path: D:\nginx-1.22.1\html\
+  #  file-path: file: ./multipart/img/
+  file-url: http://jiedongjun.oicp.io:28437/

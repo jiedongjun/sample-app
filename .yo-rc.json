@@ -41,6 +41,8 @@
     "jwtSecretKey": "NDg3ZGE2MzE0ZTE5MDllNWQwOTkyZWMwYjg5YzE3MGUxMDI2MDNhNGIyYTgxNWMyOWEzNDc0NzlmYzNjYjFkZTM2MDJkYTY1OWEyMDI4NWFkZDA1NmQ1YWI4MTU3MDIxYjQyN2U5NWRjNmVhMzFhZTc1ZmM2ZmRjZWM3OWFhZWQ=",
     "clientPackageManager": "npm",
     "clientThemeVariant": "",
-    "languages": ["en"]
+    "languages": ["en"],
+    "lastLiquibaseTimestamp": 1679493188000,
+    "entities": ["Sample", "SampleFile"]
   }
 }

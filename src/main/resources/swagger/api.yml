@@ -11,13 +11,13 @@ servers:
     description: Development server with TLS Profile
 paths: {}
 components:
-  responses:
-    Problem:
-      description: error occurred - see status code and problem object for more information.
-      content:
-        'application/problem+json':
-          schema:
-            $ref: 'https://opensource.zalando.com/problem/schema.yaml#/Problem'
+  #  responses:
+  #    Problem:
+  #      description: error occurred - see status code and problem object for more information.
+  #      content:
+  #        'application/problem+json':
+  #          schema:
+  #            $ref: 'https://opensource.zalando.com/problem/schema.yaml#/Problem'
 
   securitySchemes:
     jwt:
