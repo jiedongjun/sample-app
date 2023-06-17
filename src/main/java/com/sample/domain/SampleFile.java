@@ -26,6 +26,9 @@ public class SampleFile extends AbstractAuditingEntity implements Serializable {
     @Column(name = "sample_id")
     private Long sampleId;
 
+    @Column(name = "stop_time")
+    private Integer stopTime;
+
     public SampleFile() {}
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
@@ -100,5 +103,19 @@ public class SampleFile extends AbstractAuditingEntity implements Serializable {
             ", url='" + getUrl() + "'" +
             ", sampleId=" + getSampleId() +
             "}";
+    }
+
+    public Integer getStopTime() {
+        return stopTime;
+    }
+
+    public void setStopTime(Integer stopTime) {
+        this.stopTime = stopTime;
+    }
+
+    public SampleFile(String url, Long sampleId, Integer stopTime) {
+        this.url = url;
+        this.sampleId = sampleId;
+        this.stopTime = stopTime;
     }
 }

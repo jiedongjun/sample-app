@@ -84,6 +84,9 @@ public class SampleResource {
         sample.setDuration(sampleNode.get("duration").asInt());
         sample.setName(sampleNode.get("name").asText());
         sample.setUserId(sampleNode.get("userId").asLong());
+        if (sampleNode.has("stopTime")) {
+            sample.setStopTime(sampleNode.get("stopTime").asInt());
+        }
         if (sampleNode.has("id")) {
             sample.setId(sampleNode.get("id").asLong());
         }
@@ -105,7 +108,11 @@ public class SampleResource {
             list.forEach(
                 sampleFile -> {
                     String url = sampleFile.get("url").asText();
-                    SampleFile newSampleFile = new SampleFile(url, finalSample.getId());
+                    Integer stopTime = null;
+                    if (sampleFile.has("stopTime")) {
+                        stopTime = sampleFile.get("stopTime").asInt();
+                    }
+                    SampleFile newSampleFile = new SampleFile(url, finalSample.getId(), stopTime);
                     if (sampleFile.has("id") && sampleFile.get("id").asLong() != 0) {
                         newSampleFile.setId(sampleFile.get("id").asLong());
                     }

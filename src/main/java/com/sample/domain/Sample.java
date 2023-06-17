@@ -123,6 +123,7 @@ public class Sample extends AbstractAuditingEntity implements Serializable {
         sampleVM.setDuration(this.getDuration());
         sampleVM.setName(this.getName());
         sampleVM.setUserId(this.getUserId());
+        sampleVM.setStopTime(this.getStopTime());
         sampleVM.setCreatedBy(this.getCreatedBy());
         sampleVM.setCreatedDate(this.getCreatedDate());
         sampleVM.setLastModifiedBy(this.getLastModifiedBy());

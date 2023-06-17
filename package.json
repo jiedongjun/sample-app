@@ -20,7 +20,7 @@
     "pretest": "npm run lint",
     "test": "ng test --coverage --log-heap-usage -w=2",
     "test:watch": "npm run test -- --watch",
-    "webapp:build": "npm run clean-www && npm run webapp:build:dev",
+    "webapp:build": "SET NODE_OPTIONS=--openssl-legacy-provider && npm run clean-www && npm run webapp:build:dev",
     "webapp:build:dev": "ng build",
     "webapp:build:prod": "ng build --prod",
     "webapp:dev": "ng serve",
